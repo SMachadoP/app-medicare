@@ -2,13 +2,13 @@
 
 import React from "react";
 import { getAuth, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
-import { firebaseApp } from "../firebase";
-import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import { firebaseApp } from "../firebase";
 import logo from "../logoclinica.jpg";
 import fondoClinica from "../fondoPaginaWeb.jpg";
 
-function LoginPagina() {
+const LoginPagina = () => {
   const navigate = useNavigate();
 
   const handleLogin = async () => {
@@ -18,14 +18,34 @@ function LoginPagina() {
     try {
       const result = await signInWithPopup(auth, provider);
       const email = result.user.email;
+      const nombre = result.user.displayName || "";
 
-      // Usar GET según tu backend
-      const respuesta = await axios.get(`http://localhost:8080/appMedica/rest/usuarios/correo/${email}`);
-      const usuarios = respuesta.data;
+      let usuarios = [];
 
-      if (usuarios.length === 0) {
-        alert("No se encontró un usuario registrado con ese correo.");
-        return;
+      // Intentar obtener el usuario por correo
+      try {
+        const respuesta = await axios.get(`http://localhost:8080/appMedica/rest/usuarios/correo/${email}`);
+        usuarios = respuesta.data;
+      } catch (error) {
+        if (error.response && error.response.status === 404) {
+          // Usuario no encontrado, se crea uno nuevo
+          const nuevoUsuario = {
+            nombre: nombre,
+            correo: email,
+            rol: "paciente"
+          };
+          await axios.post(`http://localhost:8080/appMedica/rest/usuarios`, nuevoUsuario);
+
+          // Reintentar obtenerlo después de crearlo
+          const nuevaRespuesta = await axios.get(`http://localhost:8080/appMedica/rest/usuarios/correo/${email}`);
+          usuarios = nuevaRespuesta.data;
+        } else {
+          throw error;
+        }
+      }
+
+      if (!usuarios || usuarios.length === 0) {
+        throw new Error("No se pudo obtener el usuario tras crearlo.");
       }
 
       const rol = usuarios[0].rol.toLowerCase();
@@ -44,7 +64,7 @@ function LoginPagina() {
 
   const estilos = {
     pageContainer: {
-      backgroundImage: `url(${fondoClinica})`, // ← CORREGIDO aquí
+      backgroundImage: `url(${fondoClinica})`,
       backgroundRepeat: "no-repeat",
       backgroundSize: "cover",
       backgroundPosition: "center center",
@@ -114,9 +134,11 @@ function LoginPagina() {
       </main>
     </div>
   );
-}
+};
 
 export default LoginPagina;
+
+
 
 
 

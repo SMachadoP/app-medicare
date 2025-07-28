@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { auth } from "../firebase"; // Mantienes solo para obtener UID del login
+import { auth } from "../firebase";
 
 const SolicitarCita = () => {
   const [especialidades, setEspecialidades] = useState([]);
@@ -18,10 +18,8 @@ const SolicitarCita = () => {
     horarios: false,
   });
 
-  const pacienteId = auth.currentUser?.uid;
-  const pacienteNombre = auth.currentUser?.displayName || "Paciente Anónimo";
-
-  const API_URL = "http://localhost:8080/appMedica"; // Cambia por tu endpoint real
+  const API_URL = "http://localhost:8080/appMedica/rest";
+  const pacienteEmail = auth.currentUser?.email;
 
   useEffect(() => {
     const cargarEspecialidades = async () => {
@@ -34,24 +32,25 @@ const SolicitarCita = () => {
         setCargando((prev) => ({ ...prev, especialidades: false }));
       }
     };
+
     cargarEspecialidades();
   }, []);
 
   useEffect(() => {
     if (!especialidadSel) {
       setMedicos([]);
+      setMedicoSel("");
       return;
     }
 
     const cargarMedicos = async () => {
       setCargando((prev) => ({ ...prev, medicos: true }));
       try {
-        const res = await axios.get(`${API_URL}/medicos`, {
-          params: { especialidad: especialidadSel },
-        });
+        const res = await axios.get(`${API_URL}/usuarios/medicoespecialidad/${especialidadSel}`);
         setMedicos(res.data);
       } catch (error) {
         console.error("Error al cargar médicos:", error);
+        setMedicos([]);
       } finally {
         setCargando((prev) => ({ ...prev, medicos: false }));
       }
@@ -63,18 +62,18 @@ const SolicitarCita = () => {
   useEffect(() => {
     if (!medicoSel) {
       setHorarios([]);
+      setHorarioSel("");
       return;
     }
 
     const cargarHorarios = async () => {
       setCargando((prev) => ({ ...prev, horarios: true }));
       try {
-        const res = await axios.get(`${API_URL}/horarios`, {
-          params: { medicoId: medicoSel },
-        });
+        const res = await axios.get(`${API_URL}/horarios/idmedico/${medicoSel}`);
         setHorarios(res.data);
       } catch (error) {
         console.error("Error al cargar horarios:", error);
+        setHorarios([]);
       } finally {
         setCargando((prev) => ({ ...prev, horarios: false }));
       }
@@ -86,51 +85,90 @@ const SolicitarCita = () => {
   const agendarCita = async (e) => {
     e.preventDefault();
 
-    if (!especialidadSel || !medicoSel || !horarioSel) {
+    if (!especialidadSel || !medicoSel || !horarioSel || !pacienteEmail) {
       alert("Debes completar todos los campos.");
       return;
     }
 
     try {
+      // Obtener datos completos del paciente por correo
+      const usuarioRes = await axios.get(`${API_URL}/usuarios/correo/${pacienteEmail}`);
+      const paciente = usuarioRes.data[0];
+
+      if (!paciente) {
+        alert("No se encontró el paciente.");
+        return;
+      }
+
+      // Buscar el horario seleccionado para enviar toda la info anidada
+      const horarioSeleccionadoObj = horarios.find((h) => h.id === parseInt(horarioSel));
+      if (!horarioSeleccionadoObj) {
+        alert("Horario inválido seleccionado.");
+        return;
+      }
+
+      // Buscar el médico seleccionado
+      const medicoSeleccionadoObj = medicos.find((m) => m.id === parseInt(medicoSel));
+      if (!medicoSeleccionadoObj) {
+        alert("Médico inválido seleccionado.");
+        return;
+      }
+
+      // Buscar la especialidad seleccionada
+      const especialidadSeleccionadaObj = especialidades.find((e) => e.id === parseInt(especialidadSel));
+      if (!especialidadSeleccionadaObj) {
+        alert("Especialidad inválida seleccionada.");
+        return;
+      }
+
+      // Construir el objeto cita con estructura completa esperada
       const cita = {
-        pacienteId,
-        pacienteNombre,
-        medicoId: medicoSel,
-        especialidad: especialidadSel,
-        horarioId: horarioSel,
+        fecha: timestampSeleccionado,
+        estado: "pendiente",
+        horario: horarioSeleccionadoObj,
+        paciente: paciente,
+        medico: medicoSeleccionadoObj,
+        especialidad: especialidadSeleccionadaObj,
       };
+
       await axios.post(`${API_URL}/citas`, cita);
+
       alert("¡Cita agendada con éxito!");
 
-      // Reset
+      // Resetear formulario
       setEspecialidadSel("");
       setMedicoSel("");
       setHorarios([]);
       setHorarioSel("");
       setTimestampSeleccionado(null);
     } catch (error) {
-      console.error("Error al agendar cita:", error);
-      alert("Error al agendar cita.");
+      console.error("Error al agendar cita:", error.response ? error.response.data : error.message);
+      alert("Error al agendar cita: " + (error.response?.data?.mensaje || error.message || "Error desconocido"));
     }
+
   };
 
-  const formatearFecha = (isoDate) => {
-    const fecha = new Date(isoDate);
-    return fecha.toLocaleString("es-EC", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
+  // Limpia y formatea fecha para mostrar
+  const formatearFecha = (fechaStr) => {
+  const fechaLimpia = fechaStr.replace("[UTC]", "");
+  const fecha = new Date(fechaLimpia);
+  return fecha.toLocaleString("es-EC", {
+    dateStyle: "short",
+    timeStyle: "short",
+    hour12: false,
+    timeZone: "America/Guayaquil", // <- clave aquí
+  });
+};
 
-  const puedeAgendar =
-    especialidadSel !== "" && medicoSel !== "" && horarioSel !== "";
+
+  const puedeAgendar = especialidadSel && medicoSel && horarioSel;
 
   return (
     <div style={{ width: "100%" }}>
-      <form style={{ display: "flex", flexDirection: "column", gap: "1rem" }} onSubmit={agendarCita}>
+      <form
+        style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
+        onSubmit={agendarCita}
+      >
         {/* Especialidades */}
         <div>
           <label>Especialidad</label>
@@ -144,8 +182,8 @@ const SolicitarCita = () => {
             >
               <option value="">-- Selecciona una --</option>
               {especialidades.map((e) => (
-                <option key={e.id} value={e.nombre}>
-                  {e.nombre}
+                <option key={e.id} value={e.id}>
+                  {e.nombreEspecialidad}
                 </option>
               ))}
             </select>
@@ -167,7 +205,7 @@ const SolicitarCita = () => {
               <option value="">-- Selecciona un médico --</option>
               {medicos.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {m.nombre}
+                  {m.nombre || m.cedula || "Sin nombre"}
                 </option>
               ))}
             </select>
@@ -184,7 +222,7 @@ const SolicitarCita = () => {
               value={horarioSel}
               onChange={(e) => {
                 setHorarioSel(e.target.value);
-                const h = horarios.find((h) => h.id === e.target.value);
+                const h = horarios.find((h) => h.id === parseInt(e.target.value));
                 if (h) setTimestampSeleccionado(h.fecha);
               }}
               required
@@ -210,5 +248,8 @@ const SolicitarCita = () => {
 };
 
 export default SolicitarCita;
+
+
+
 
 

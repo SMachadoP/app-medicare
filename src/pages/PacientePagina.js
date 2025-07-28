@@ -25,44 +25,58 @@ const PacientePerfil = () => {
       if (usuario) {
         setUser(usuario);
         await cargarDatos(usuario.email);
-        await cargarCitas(usuario.uid);
+        await cargarCitas(usuario.email);
       }
     });
     return () => unsubscribe();
   }, []);
 
   const cargarDatos = async (correo) => {
-  try {
-    const res = await fetch(`http://localhost:8080/appMedica/rest/usuarios/correo/${correo}`);
-    if (!res.ok) throw new Error("Error al obtener datos del paciente");
-    const data = await res.json();
-
-    if (Array.isArray(data) && data.length > 0) {
-      setDatos(data[0]); // toma el primer objeto del array
-    } else {
-      console.warn("No se encontró usuario con ese correo");
-      setDatos({
-        nombre: "",
-        cedula: "",
-        telefono: "",
-        direccion: "",
-        genero: ""
-      });
-    }
-  } catch (error) {
-    console.error("Error cargando perfil:", error);
-  }
-};
-
-
-  const cargarCitas = async (uid) => {
     try {
-      const res = await fetch(`http://localhost:8080/appMedica/citas/paciente/${uid}`);
-      if (!res.ok) throw new Error("Error al obtener citas");
-      const citasObtenidas = await res.json();
+      const res = await fetch(`http://localhost:8080/appMedica/rest/usuarios/correo/${correo}`);
+      if (!res.ok) throw new Error("Error al obtener datos del paciente");
+      const data = await res.json();
+
+      if (Array.isArray(data) && data.length > 0) {
+        setDatos(data[0]); // toma el primer objeto del array
+      } else {
+        console.warn("No se encontró usuario con ese correo");
+        setDatos({
+          nombre: "",
+          cedula: "",
+          telefono: "",
+          direccion: "",
+          genero: ""
+        });
+      }
+    } catch (error) {
+      console.error("Error cargando perfil:", error);
+    }
+  };
+
+
+  const cargarCitas = async (correo) => {
+    try {
+      // 1. Obtener usuario completo a partir del correo
+      const resUsuario = await fetch(`http://localhost:8080/appMedica/rest/usuarios/correo/${correo}`);
+      if (!resUsuario.ok) throw new Error("Error al obtener datos del usuario");
+      const dataUsuario = await resUsuario.json();
+
+      if (!Array.isArray(dataUsuario) || dataUsuario.length === 0) {
+        throw new Error("Usuario no encontrado");
+      }
+
+      const usuario = dataUsuario[0];
+
+      // 2. Obtener citas con el id del usuario
+      const resCitas = await fetch(`http://localhost:8080/appMedica/rest/citas/id/${usuario.id}`);
+      if (!resCitas.ok) throw new Error("Error al obtener citas");
+      const citasObtenidas = await resCitas.json();
+
       setCitas(citasObtenidas);
     } catch (error) {
       console.error("Error cargando citas:", error);
+      setCitas([]); // limpiar citas en caso de error
     }
   };
 
@@ -97,11 +111,13 @@ const PacientePerfil = () => {
   const guardarPerfil = async (e) => {
     e.preventDefault();
 
+    const correo = auth.currentUser.email;
+
     if (!validarCedula(datos.cedula)) return alert("Cédula no válida.");
     if (!validarTelefono(datos.telefono)) return alert("Teléfono no válido.");
 
     try {
-      const res = await fetch(`http://localhost:8080/appMedica/pacientes/${user.uid}`, {
+      const res = await fetch(`http://localhost:8080/appMedica/rest/usuarios/correo/${correo}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json"
@@ -192,17 +208,16 @@ const PacientePerfil = () => {
               {citas.length === 0 ? (
                 <p>No tienes citas registradas.</p>
               ) : (
-                citas.map((cita) => (
-                  <div key={cita.id} style={{ border: "1px solid #ccc", padding: "1rem", marginBottom: "1rem", borderRadius: "8px" }}>
-                    <p><strong>Especialidad:</strong> {cita.especialidad}</p>
-                    <p><strong>Doctor:</strong> {cita.nombreMedico}</p>
-                    <p><strong>Fecha:</strong> {cita.fecha}</p>
-                    <p><strong>Estado:</strong> {cita.estado}</p>
-                    {(cita.estado === "pendiente" || cita.estado === "confirmada") && (
-                      <button onClick={() => cancelarCita(cita.id)}>Cancelar Cita</button>
-                    )}
-                  </div>
-                ))
+                <ul>
+                  {citas.map(cita => (
+                    <li key={cita.id}>
+                      <strong>Fecha:</strong> {new Date(cita.fecha).toLocaleString()} <br />
+                      <strong>Médico:</strong> {cita.medico?.nombre || 'Desconocido'} <br />
+                      <strong>Especialidad:</strong> {cita.especialidad?.nombreEspecialidad || 'Desconocida'} <br />
+                      <strong>Estado:</strong> {cita.estado}
+                    </li>
+                  ))}
+                </ul>
               )}
             </>
           )}
