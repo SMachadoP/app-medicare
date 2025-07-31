@@ -3,6 +3,7 @@ import { auth, provider } from "../firebase";
 
 // Función que se comunica con tu backend en Java
 async function registrarUsuarioEnBackend(user) {
+
   const response = await fetch("http://localhost:8080/appMedica/rest/usuarios", {
     method: "POST",
     headers: {

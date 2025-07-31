@@ -24,6 +24,7 @@ const LoginPagina = () => {
 
       // Intentar obtener el usuario por correo
       try {
+        console.log("GET →", `http://localhost:8080/appMedica/rest/usuarios/correo/${email}`);
         const respuesta = await axios.get(`http://localhost:8080/appMedica/rest/usuarios/correo/${email}`);
         usuarios = respuesta.data;
       } catch (error) {
@@ -48,7 +49,12 @@ const LoginPagina = () => {
         throw new Error("No se pudo obtener el usuario tras crearlo.");
       }
 
-      const rol = usuarios[0].rol.toLowerCase();
+      const rolRaw = usuarios[0]?.rol;
+      console.log("Rol obtenido del backend:", rolRaw);
+      if (!rolRaw) {
+        throw new Error("El servidor no devolvió un campo 'rol' para el usuario");
+      }
+      const rol = rolRaw.toLowerCase();
 
       if (rol === "admin" || rol === "administrador") {
         navigate("/Administrador");
@@ -57,8 +63,12 @@ const LoginPagina = () => {
       }
 
     } catch (error) {
-      console.error("Error al iniciar sesión:", error);
-      alert("Error al iniciar sesión con Google o al consultar el rol del usuario.");
+      console.error("Error al iniciar sesión o al consultar rol:", {
+        message: error.message,
+        response: error.response?.data,
+        status:   error.response?.status
+      });
+      alert("Error al iniciar sesión con Google o al consultar el rol del usuario."+ error.message);
     }
   };
 

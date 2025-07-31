@@ -18,13 +18,13 @@ const SolicitarCita = () => {
     horarios: false,
   });
 
-  const API_URL = "http://localhost:8080/appMedica/rest";
+  const API = "http://localhost:8080/appMedica/rest";
   const pacienteEmail = auth.currentUser?.email;
 
   useEffect(() => {
     const cargarEspecialidades = async () => {
       try {
-        const res = await axios.get(`${API_URL}/especialidades`);
+        const res = await axios.get(`${API}/especialidades`);
         setEspecialidades(res.data);
       } catch (error) {
         console.error("Error al cargar especialidades:", error);
@@ -34,7 +34,7 @@ const SolicitarCita = () => {
     };
 
     cargarEspecialidades();
-  }, []);
+  }, [API]);
 
   useEffect(() => {
     if (!especialidadSel) {
@@ -46,7 +46,7 @@ const SolicitarCita = () => {
     const cargarMedicos = async () => {
       setCargando((prev) => ({ ...prev, medicos: true }));
       try {
-        const res = await axios.get(`${API_URL}/usuarios/medicoespecialidad/${especialidadSel}`);
+        const res = await axios.get(`${API}/usuarios/medicoespecialidad/${especialidadSel}`);
         setMedicos(res.data);
       } catch (error) {
         console.error("Error al cargar médicos:", error);
@@ -69,7 +69,7 @@ const SolicitarCita = () => {
     const cargarHorarios = async () => {
       setCargando((prev) => ({ ...prev, horarios: true }));
       try {
-        const res = await axios.get(`${API_URL}/horarios/idmedico/${medicoSel}`);
+        const res = await axios.get(`${API}/horarios/idmedico/${medicoSel}`);
         setHorarios(res.data);
       } catch (error) {
         console.error("Error al cargar horarios:", error);
@@ -92,7 +92,7 @@ const SolicitarCita = () => {
 
     try {
       // Obtener datos completos del paciente por correo
-      const usuarioRes = await axios.get(`${API_URL}/usuarios/correo/${pacienteEmail}`);
+      const usuarioRes = await axios.get(`${API}/usuarios/correo/${pacienteEmail}`);
       const paciente = usuarioRes.data[0];
 
       if (!paciente) {
@@ -131,7 +131,7 @@ const SolicitarCita = () => {
         especialidad: especialidadSeleccionadaObj,
       };
 
-      await axios.post(`${API_URL}/citas`, cita);
+      await axios.post(`${API}/citas`, cita);
 
       alert("¡Cita agendada con éxito!");
 

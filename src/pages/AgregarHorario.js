@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { getAuth } from "firebase/auth";
 
 export default function AgregarHorario() {
@@ -10,28 +10,25 @@ export default function AgregarHorario() {
   const auth = getAuth();
   const user = auth.currentUser;
 
-  useEffect(() => {
-    const obtenerMedico = async () => {
-      const user = auth.currentUser;
-      if (user?.email) {
-        try {
-          const res = await fetch(
-            `http://localhost:8080/appMedica/rest/usuarios/correo/${user.email}`
-          );
-          if (!res.ok) throw new Error("No se encontró el médico.");
-          const medico = await res.json();
-          if (medico.length > 0) {
-            setMedicoId(medico[0].id); // ✅ CORREGIDO: tomamos el primer médico del array
-          } else {
-            alert("No se encontró ningún médico con ese correo.");
-          }
-        } catch (error) {
-          alert("No se pudo obtener el ID del médico.");
-        }
+  // 1) Memoiza la función que usa auth y API
+  const obtenerMedico = useCallback(async () => {
+    const user = auth.currentUser;
+    if (!user?.email) return;
+
+    try {
+      const res = await fetch(`http://localhost:8080/appMedica/rest/usuarios/correo/${user.email}`);
+      if (!res.ok) throw new Error("No se encontró el médico.");
+
+      const medico = await res.json();
+      if (medico.length > 0) {
+        setMedicoId(medico[0].id);
+      } else {
+        alert("No se encontró ningún médico con ese correo.");
       }
-    };
-    obtenerMedico();
-  }, []);
+    } catch (err) {
+      alert("No se pudo obtener el ID del médico.");
+    }
+  }, [auth]);
 
   const generarHorariosPorDefecto = async () => {
     if (!user) {
@@ -128,6 +125,11 @@ export default function AgregarHorario() {
       setEnviando(false);
     }
   };
+
+  // 2) Úsala en el useEffect y ponla en el array de dependencias
+  useEffect(() => {
+    obtenerMedico();
+  }, [obtenerMedico]);
 
   return (
     <div style={{ maxWidth: "400px", margin: "1rem auto" }}>

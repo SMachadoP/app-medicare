@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { auth } from "../firebase"; // solo para usar auth.currentUser
 
@@ -10,29 +10,33 @@ export default function GestionarCitas() {
 
   const medicoId = auth.currentUser?.uid;
 
-  useEffect(() => {
-    const cargarCitas = async () => {
-      if (!medicoId) {
-        setCitas([]);
-        setCargando(false);
-        return;
-      }
+  // 2) Filtros past
+  const [from,   setFrom]   = useState("");
+  const [to,     setTo]     = useState("");
+  const [estado, setEstado] = useState("");
 
-      try {
-        const response = await axios.get(`${API_URL}/citas`, {
-          params: { medicoId },
-        });
-        setCitas(response.data);
-      } catch (error) {
-        console.error("Error cargando citas:", error);
-        setCitas([]);
-      } finally {
-        setCargando(false);
-      }
-    };
-
-    cargarCitas();
+  const cargarCitas = useCallback(async () => {
+    setCargando(true);
+    if (!medicoId) {
+      setCitas([]);
+      setCargando(false);
+      return;
+    }
+    try {
+      const { data } = await axios.get(`${API_URL}/citas`, { params: { medicoId } });
+      setCitas(data);
+    } catch (err) {
+      console.error("Error cargando citas:", err);
+      setCitas([]);
+    } finally {
+      setCargando(false);
+    }
   }, [medicoId]);
+
+  // 2) La usamos en el useEffect y la ponemos en el array de deps
+  useEffect(() => {
+    cargarCitas();
+  }, [cargarCitas]);
 
   const cambiarEstado = async (citaId, nuevoEstado, horarioId) => {
     try {
@@ -81,13 +85,24 @@ export default function GestionarCitas() {
     });
   };
 
+  // 5) División pendiente vs pasado
+  const ahora = new Date();
+  const citasFuturas = citas.filter(c => new Date(c.fecha) >= ahora);
+  let citasPasadas    = citas.filter(c => new Date(c.fecha) < ahora);
+
+  // 6) Aplicar filtros a las pasadas
+  if (from)   citasPasadas = citasPasadas.filter(c => new Date(c.fecha) >= new Date(from));
+  if (to)     citasPasadas = citasPasadas.filter(c => new Date(c.fecha) <= new Date(to));
+  if (estado) citasPasadas = citasPasadas.filter(c => c.estado === estado);
+
+
   return (
     <div style={{ maxWidth: "800px", margin: "0 auto", padding: "1rem" }}>
-      <h2>Gestión de Citas (Mis Pacientes)</h2>
+      <h2>Mis Citas Pendientes</h2>
 
       {cargando ? (
         <p>Cargando citas...</p>
-      ) : citas.length === 0 ? (
+      ) : citasFuturas.length === 0 ? (
         <p>No tienes citas agendadas.</p>
       ) : (
         <table
@@ -142,6 +157,42 @@ export default function GestionarCitas() {
           </tbody>
         </table>
       )}
+
+      <h2>Historial de Citas</h2>
+      {/* Controles de filtro */}
+      <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
+        <label>Desde <input type="date" value={from} onChange={e=>setFrom(e.target.value)} /></label>
+        <label>Hasta <input type="date" value={to}   onChange={e=>setTo(e.target.value)} /></label>
+        <label>Estado
+          <select value={estado} onChange={e=>setEstado(e.target.value)}>
+            <option value="">Todos</option>
+            <option value="pendiente">Pendiente</option>
+            <option value="confirmada">Confirmada</option>
+            <option value="negada">Negada</option>
+          </select>
+        </label>
+        <button onClick={() => {/* opcional: recargar o limpiar filtros */}}>Aplicar</button>
+      </div>
+
+      {/* Tabla de pasadas */}
+      {cargando ? <p>Cargando…</p>
+        : citasPasadas.length === 0 ? <p>No hay citas pasadas.</p>
+        : (
+          <table style={{ width:"100%", borderCollapse:"collapse" }}>
+            <thead>{/* cabecera similar */}</thead>
+            <tbody>
+              {citasPasadas.map(c => (
+                <tr key={c.id}>
+                  <td>{c.nombrePaciente}</td>
+                  <td>{formatearFecha(c.fecha)}</td>
+                  <td>{c.estado}</td>
+                  {/* no hay “Cambiar estado” aquí */}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )
+      }
     </div>
   );
 }

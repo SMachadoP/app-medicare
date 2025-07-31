@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import AgregarHorario from "./AgregarHorario";
 import GestionarCitas from "./GestionarCitas";
@@ -20,19 +20,8 @@ const AdministradorPagina = () => {
 
   const auth = getAuth();
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (usr) => {
-      if (usr) {
-        setUser(usr);
-        await cargarEspecialidades(usr);
-        await cargarDatosDesdeBackend(usr);
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
   // Carga perfil
-  const cargarDatosDesdeBackend = async (usr) => {
+  const cargarDatosDesdeBackend = useCallback(async (usr) => {
     try {
       const token = await usr.getIdToken();
       const correo = usr.email;
@@ -54,10 +43,10 @@ const AdministradorPagina = () => {
     } catch (error) {
       console.error("Error de red al cargar perfil:", error);
     }
-  };
+  }, []);
 
   // Carga especialidades
-  const cargarEspecialidades = async (usr) => {
+  const cargarEspecialidades = useCallback(async (usr) => {
     try {
       const token = await usr.getIdToken();
       const res = await fetch("http://localhost:8080/appMedica/rest/especialidades", {
@@ -74,7 +63,18 @@ const AdministradorPagina = () => {
     } finally {
       setCargandoEspecialidades(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (usr) => {
+      if (usr) {
+        setUser(usr);
+        await cargarEspecialidades(usr);
+        await cargarDatosDesdeBackend(usr);
+      }
+    });
+    return () => unsubscribe();
+  }, [auth, cargarEspecialidades, cargarDatosDesdeBackend]);
 
   // Validación cédula ecuatoriana
   const validarCedula = (cedula) => {

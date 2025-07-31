@@ -1,7 +1,6 @@
 import axios from "axios";
-import { auth } from "../firebase";
 
-const API_URL = "http://localhost:8080/appMedica";
+const API_URL = "http://localhost:8080/appMedica"; 
 
 /**
  * Limpia la cadena de fecha eliminando el sufijo [UTC] y cualquier contenido
