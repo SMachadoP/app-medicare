@@ -1,6 +1,7 @@
 import axios from "axios";
+import { auth } from "../firebase";
 
-const API_URL = "http://localhost:8080/appMedica"; 
+const API_URL = "https://b2b642415388.ngrok-free.app/appMedica/rest"; 
 
 /**
  * Limpia la cadena de fecha eliminando el sufijo [UTC] y cualquier contenido
@@ -50,6 +51,11 @@ const obtenerCitasDePaciente = async (uid) => {
   try {
     const response = await axios.get(`${API_URL}/citas`, {
       params: { pacienteId: uid },
+      headers: {
+        Authorization: `Bearer ${auth.currentUser?.getIdToken()}`,
+        'ngrok-skip-browser-warning': 'true',
+        'Accept': 'application/json',
+      },
     });
 
     const citasCrudas = response.data;

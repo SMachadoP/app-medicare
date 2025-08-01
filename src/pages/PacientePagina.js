@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState} from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import SolicitarCita from "./SolicitarCita";
 import logo from "../logoclinica.jpg";
@@ -22,17 +22,34 @@ const PacientePerfil = () => {
   const [user, setUser] = useState(null);
   const [citas, setCitas] = useState([]);
   const [vistaActiva, setVistaActiva] = useState("perfil");
+  const [cargandoCitas, setCargandoCitas] = useState(false);
   const auth = getAuth();
 
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (usuario) => {
+      if (usuario) {
+        setUser(usuario);
+        await cargarDatos(usuario.email);
+        await cargarEspecialidades();
+        await cargarCitas(usuario.email);
+      }
+    });
+    return () => unsubscribe();
+  }, [auth]);
 
-  const cargarDatos = useCallback(async (correo) => {
+  const cargarDatos = async (correo) => {
     try {
-      const res = await fetch(`http://localhost:8080/appMedica/rest/usuarios/correo/${correo}`);
+      const res = await fetch(`https://b2b642415388.ngrok-free.app/appMedica/rest/usuarios/correo/${correo}`, {
+        headers: {
+          'ngrok-skip-browser-warning': 'true',
+          'Accept': 'application/json'
+        }
+      });
       if (!res.ok) throw new Error("Error al obtener datos del paciente");
       const data = await res.json();
 
       if (Array.isArray(data) && data.length > 0) {
-        setDatos(data[0]); // toma el primer objeto del array
+        setDatos(data[0]);
       } else {
         console.warn("No se encontró usuario con ese correo");
         setDatos({
@@ -46,14 +63,38 @@ const PacientePerfil = () => {
     } catch (error) {
       console.error("Error cargando perfil:", error);
     }
-  }, []);
+  };
 
+  const cargarEspecialidades = async () => {
+    try {
+      const res = await fetch(`https://b2b642415388.ngrok-free.app/appMedica/rest/especialidades`, {
+        headers: {
+          'ngrok-skip-browser-warning': 'true',
+          'Accept': 'application/json'
+        }
+      });
+      if (!res.ok) throw new Error("Error al obtener especialidades");
+      const data = await res.json();
+      setEspList(data);
+    } catch (error) {
+      console.error("Error cargando especialidades:", error);
+      setEspList([]);
+    }
+  };
 
-  const cargarCitas = useCallback(async (correo) => {
+  const cargarCitas = async (correo) => {
+    setCargandoCitas(true);
     try {
       // 1. Obtener usuario completo a partir del correo
-      const resUsuario = await fetch(`http://localhost:8080/appMedica/rest/usuarios/correo/${correo}`);
-      if (!resUsuario.ok) throw new Error("Error al obtener datos del usuario");
+      const resUsuario = await fetch(`https://b2b642415388.ngrok-free.app/appMedica/rest/usuarios/correo/${correo}`, {
+        headers: {
+          'ngrok-skip-browser-warning': 'true',
+          'Accept': 'application/json'
+        }
+      });
+      if (!resUsuario.ok) {
+        throw new Error("Error al obtener datos del usuario");
+      }
       const dataUsuario = await resUsuario.json();
 
       if (!Array.isArray(dataUsuario) || dataUsuario.length === 0) {
@@ -63,16 +104,31 @@ const PacientePerfil = () => {
       const usuario = dataUsuario[0];
 
       // 2. Obtener citas con el id del usuario
-      const resCitas = await fetch(`http://localhost:8080/appMedica/rest/citas/id/${usuario.id}`);
-      if (!resCitas.ok) throw new Error("Error al obtener citas");
+      const resCitas = await fetch(`https://b2b642415388.ngrok-free.app/appMedica/rest/citas/id/${usuario.id}`, {
+        headers: {
+          'ngrok-skip-browser-warning': 'true',
+          'Accept': 'application/json'
+        }
+      });
+      
+      if (!resCitas.ok) {
+        if (resCitas.status === 404) {
+          setCitas([]);
+          return;
+        }
+        throw new Error(`Error al obtener citas: ${resCitas.status}`);
+      }
+      
       const citasObtenidas = await resCitas.json();
-
-      setCitas(citasObtenidas);
+      const citasArray = Array.isArray(citasObtenidas) ? citasObtenidas : [];
+      setCitas(citasArray);
     } catch (error) {
       console.error("Error cargando citas:", error);
-      setCitas([]); // limpiar citas en caso de error
+      setCitas([]);
+    } finally {
+      setCargandoCitas(false);
     }
-  }, []);
+  };
 
   const manejarCambio = (e) => {
     setDatos({ ...datos, [e.target.name]: e.target.value });
@@ -111,19 +167,35 @@ const PacientePerfil = () => {
     if (!validarTelefono(datos.telefono)) return alert("Teléfono no válido.");
 
     try {
-      const res = await fetch(`http://localhost:8080/appMedica/rest/usuarios/correo/${correo}`, {
+      const res = await fetch(`https://b2b642415388.ngrok-free.app/appMedica/rest/usuarios/correo/${correo}`, {
         method: "PUT",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          'ngrok-skip-browser-warning': 'true',
+          'Accept': 'application/json'
         },
         body: JSON.stringify(datos)
       });
 
-      if (!res.ok) throw new Error("Error al actualizar el perfil");
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("Error del servidor:", errorText);
+        throw new Error(`Error del servidor: ${res.status}`);
+      }
 
-      alert("Perfil actualizado correctamente");
+      // Intentar parsear como JSON, si no, usar el texto directamente
+      let responseData;
+      try {
+        const responseText = await res.text();
+        responseData = responseText ? JSON.parse(responseText) : {};
+      } catch (parseError) {
+        responseData = { mensaje: "Perfil actualizado correctamente" };
+      }
+
+      alert(responseData.mensaje || "Perfil actualizado correctamente");
     } catch (error) {
       console.error("Error al guardar perfil:", error);
+      alert("Error al guardar perfil: " + error.message);
     }
   };
 
@@ -131,8 +203,12 @@ const PacientePerfil = () => {
     if (!window.confirm("¿Estás seguro de que quieres cancelar esta cita?")) return;
 
     try {
-      const res = await fetch(`http://localhost:8080/appMedica/citas/${citaId}`, {
-        method: "DELETE"
+      const res = await fetch(`https://b2b642415388.ngrok-free.app/appMedica/rest/citas/${citaId}`, {
+        method: "DELETE",
+        headers: {
+          'ngrok-skip-browser-warning': 'true',
+          'Accept': 'application/json'
+        }
       });
 
       if (!res.ok) throw new Error("Error al cancelar cita");
@@ -145,25 +221,38 @@ const PacientePerfil = () => {
     }
   };
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (usuario) => {
-      if (usuario) {
-        setUser(usuario);
-        await cargarDatos(usuario.email);
-        await cargarCitas(usuario.email);
+  const formatearFecha = (fechaStr) => {
+    if (!fechaStr) return "Fecha no disponible";
+    
+    try {
+      // Limpiar la fecha si tiene sufijos como [UTC]
+      const fechaLimpia = fechaStr.includes('[') ? fechaStr.substring(0, fechaStr.indexOf('[')).trim() : fechaStr;
+      const fecha = new Date(fechaLimpia);
+      
+      if (isNaN(fecha.getTime())) {
+        return "Fecha inválida";
       }
-    });
-    return () => unsubscribe();
-  }, [auth, cargarDatos, cargarCitas]);
+      
+      return fecha.toLocaleString("es-EC", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "America/Guayaquil"
+      });
+    } catch (error) {
+      console.error("Error formateando fecha:", error);
+      return "Error en fecha";
+    }
+  };
 
-  useEffect(() => {
-  fetch(`http://localhost:8080/appMedica/rest/especialidades`)
-    .then(r => r.json())
-    .then(setEspList)
-    .catch(console.error);
-}, []);
-
-  // (Estilos sin cambio, puedes mantener los que ya tenías)
+  // Función para recargar citas (útil cuando se agenda una nueva)
+  const recargarCitas = () => {
+    if (user?.email) {
+      cargarCitas(user.email);
+    }
+  };
 
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
@@ -175,6 +264,9 @@ const PacientePerfil = () => {
         <button onClick={() => setVistaActiva("perfil")} style={{ ...navBtnStyle }}>Mi Perfil</button>
         <button onClick={() => setVistaActiva("solicitar")} style={{ ...navBtnStyle }}>Solicitar Cita</button>
         <button onClick={() => setVistaActiva("citas")} style={{ ...navBtnStyle }}>Mis Citas</button>
+        <Link to="/" style={{ color: "white", textDecoration: "none", marginTop: "2rem", display: "block" }}>
+          Cerrar Sesión
+        </Link>
       </nav>
 
       {/* Contenido principal */}
@@ -188,8 +280,8 @@ const PacientePerfil = () => {
       }}>
         <div style={{
           width: "100%",
-          maxWidth: "600px",
-          backgroundColor: "rgba(255,255,255,0.9)",
+          maxWidth: "800px",
+          backgroundColor: "rgba(255,255,255,0.95)",
           borderRadius: "8px",
           padding: "2rem"
         }}>
@@ -198,152 +290,304 @@ const PacientePerfil = () => {
           {vistaActiva === "perfil" && (
             <form onSubmit={guardarPerfil} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               <h2>Mi Perfil</h2>
-              <input type="text" name="nombre" value={datos.nombre} onChange={manejarCambio} required placeholder="Nombre" />
-              <input type="text" name="cedula" value={datos.cedula} onChange={manejarCambio} required placeholder="Cédula" />
-              <input type="tel" name="telefono" value={datos.telefono} onChange={manejarCambio} required placeholder="Teléfono" />
-              <input type="text" name="direccion" value={datos.direccion} onChange={manejarCambio} required placeholder="Dirección" />
-              <input type="text" name="genero" value={datos.genero} onChange={manejarCambio} required placeholder="Género" />
-              <button type="submit">Guardar Cambios</button>
+              <input 
+                type="text" 
+                name="nombre" 
+                value={datos.nombre} 
+                onChange={manejarCambio} 
+                required 
+                placeholder="Nombre"
+                style={{ padding: "0.5rem", borderRadius: "4px", border: "1px solid #ccc" }}
+              />
+              <input 
+                type="text" 
+                name="cedula" 
+                value={datos.cedula} 
+                onChange={manejarCambio} 
+                required 
+                placeholder="Cédula"
+                style={{ padding: "0.5rem", borderRadius: "4px", border: "1px solid #ccc" }}
+              />
+              <input 
+                type="tel" 
+                name="telefono" 
+                value={datos.telefono} 
+                onChange={manejarCambio} 
+                required 
+                placeholder="Teléfono"
+                style={{ padding: "0.5rem", borderRadius: "4px", border: "1px solid #ccc" }}
+              />
+              <input 
+                type="text" 
+                name="direccion" 
+                value={datos.direccion} 
+                onChange={manejarCambio} 
+                required 
+                placeholder="Dirección"
+                style={{ padding: "0.5rem", borderRadius: "4px", border: "1px solid #ccc" }}
+              />
+              <input 
+                type="text" 
+                name="genero" 
+                value={datos.genero} 
+                onChange={manejarCambio} 
+                required 
+                placeholder="Género"
+                style={{ padding: "0.5rem", borderRadius: "4px", border: "1px solid #ccc" }}
+              />
+              <button 
+                type="submit"
+                style={{ 
+                  padding: "0.75rem", 
+                  backgroundColor: "#2b6cb0", 
+                  color: "white", 
+                  border: "none", 
+                  borderRadius: "4px", 
+                  cursor: "pointer" 
+                }}
+              >
+                Guardar Cambios
+              </button>
             </form>
           )}
 
           {vistaActiva === "solicitar" && (
             <>
               <h2>Solicitar Cita</h2>
-              <SolicitarCita userId={user?.uid} />
+              <SolicitarCita userId={user?.uid} onCitaAgendada={recargarCitas} />
             </>
           )}
 
           {vistaActiva === "citas" && (
             <>
               <h2>Mis Citas</h2>
+              
+              {cargandoCitas ? (
+                <p>Cargando citas...</p>
+              ) : citas.length === 0 ? (
+                <p>No tienes citas registradas.</p>
+              ) : (
+                <>
+                  {/* Dividir pendientes y pasadas */}
+                  {(() => {
+                    const ahora = new Date();
+                    const pendientes = [];
+                    const pasadas = [];
+                    
+                    citas.forEach((c) => {
+                      const fechaCitaStr = c.fecha;
+                      const fechaLimpia = fechaCitaStr.includes('[') 
+                        ? fechaCitaStr.substring(0, fechaCitaStr.indexOf('[')).trim() 
+                        : fechaCitaStr;
+                      const fechaCita = new Date(fechaLimpia);
+                      const esFutura = fechaCita > ahora;
+                      
+                      if (esFutura) {
+                        pendientes.push(c);
+                      } else {
+                        pasadas.push(c);
+                      }
+                    });
 
-              {/* 1) Dividir pendientes y pasadas */}
-              {/** convierte cita.fecha a Date */}
-              {(() => {
-                const ahora = new Date();
-                const pendientes = citas.filter(c => new Date(c.fecha) >= ahora);
-                const pasadas    = citas.filter(c => new Date(c.fecha) <  ahora);
-
-                return (
-                  <>
-                    {/* ———————— PENDIENTES ———————— */}
-                    <h3>Pendientes</h3>
-                    {pendientes.length === 0 ? (
-                      <p>No tienes citas pendientes.</p>
-                    ) : (
-                      <table style={{ width:"100%", borderCollapse:"collapse", marginBottom:"2rem" }}>
-                        <thead>
-                          <tr>
-                            <th>Fecha</th>
-                            <th>Médico</th>
-                            <th>Especialidad</th>
-                            <th>Estado</th>
-                            <th>Acciones</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {pendientes.map(cita => (
-                            <tr key={cita.id}>
-                              <td>{new Date(cita.fecha).toLocaleString()}</td>
-                              <td>{cita.medico?.nombre}</td>
-                              <td>{cita.especialidad?.nombreEspecialidad}</td>
-                              <td>{cita.estado}</td>
-                              <td>
-                                <button onClick={() => cancelarCita(cita.id)}>
-                                  Cancelar
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-
-                    {/* ———————— HISTORIAL / CITAS PASADAS ———————— */}
-                    <h3>Historial</h3>
-                    {/* Controles de filtro */}
-                    <div style={{ display:"flex", gap:"1rem", marginBottom:"1rem" }}>
-                      <label>
-                        Desde
-                        <input
-                          type="date"
-                          value={from}
-                          onChange={e => setFrom(e.target.value)}
-                        />
-                      </label>
-                      <label>
-                        Hasta
-                        <input
-                          type="date"
-                          value={to}
-                          onChange={e => setTo(e.target.value)}
-                        />
-                      </label>
-                      <label>
-                        Especialidad
-                        <select
-                          value={espId}
-                          onChange={e => setEspId(e.target.value)}
-                        >
-                          <option value="">Todas</option>
-                          {espList.map(e => (
-                            <option key={e.id} value={e.id}>
-                              {e.nombreEspecialidad}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label>
-                        Estado
-                        <select
-                          value={estado}
-                          onChange={e => setEstado(e.target.value)}
-                        >
-                          <option value="">Todos</option>
-                          <option value="pendiente">Pendiente</option>
-                          <option value="confirmada">Confirmada</option>
-                          <option value="negada">Negada</option>
-                        </select>
-                      </label>
-                    </div>
-
-                    {/* Aplicamos los filtros a las pasadas */}
-                    {(() => {
-                      let filtradas = pasadas;
-                      if (from)   filtradas = filtradas.filter(c => new Date(c.fecha) >= new Date(from));
-                      if (to)     filtradas = filtradas.filter(c => new Date(c.fecha) <= new Date(to));
-                      if (espId)  filtradas = filtradas.filter(c => c.especialidad?.id.toString() === espId);
-                      if (estado) filtradas = filtradas.filter(c => c.estado === estado);
-
-                      return filtradas.length === 0 ? (
-                        <p>No hay citas pasadas con esos filtros.</p>
-                      ) : (
-                        <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                          <thead>
-                            <tr>
-                              <th>Fecha</th>
-                              <th>Médico</th>
-                              <th>Especialidad</th>
-                              <th>Estado</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {filtradas.map(cita => (
-                              <tr key={cita.id}>
-                                <td>{new Date(cita.fecha).toLocaleString()}</td>
-                                <td>{cita.medico?.nombre}</td>
-                                <td>{cita.especialidad?.nombreEspecialidad}</td>
-                                <td>{cita.estado}</td>
+                    return (
+                      <>
+                        {/* CITAS PENDIENTES */}
+                        <h3>Citas Pendientes ({pendientes.length})</h3>
+                        {pendientes.length === 0 ? (
+                          <p>No tienes citas pendientes.</p>
+                        ) : (
+                          <table style={{ width:"100%", borderCollapse:"collapse", marginBottom:"2rem" }}>
+                            <thead>
+                              <tr style={{ backgroundColor: "#f8f9fa" }}>
+                                <th style={{ border: "1px solid #dee2e6", padding: "0.5rem", textAlign: "left" }}>Fecha</th>
+                                <th style={{ border: "1px solid #dee2e6", padding: "0.5rem", textAlign: "left" }}>Médico</th>
+                                <th style={{ border: "1px solid #dee2e6", padding: "0.5rem", textAlign: "left" }}>Especialidad</th>
+                                <th style={{ border: "1px solid #dee2e6", padding: "0.5rem", textAlign: "left" }}>Estado</th>
+                                <th style={{ border: "1px solid #dee2e6", padding: "0.5rem", textAlign: "left" }}>Acciones</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      );
-                    })()}
-                  </>
-                );
-              })()}
+                            </thead>
+                            <tbody>
+                              {pendientes.map(cita => (
+                                <tr key={cita.id}>
+                                  <td style={{ border: "1px solid #dee2e6", padding: "0.5rem" }}>
+                                    {formatearFecha(cita.fecha)}
+                                  </td>
+                                  <td style={{ border: "1px solid #dee2e6", padding: "0.5rem" }}>
+                                    {cita.medico?.nombre || "No asignado"}
+                                  </td>
+                                  <td style={{ border: "1px solid #dee2e6", padding: "0.5rem" }}>
+                                    {cita.especialidad?.nombreEspecialidad || "No especificada"}
+                                  </td>
+                                  <td style={{ border: "1px solid #dee2e6", padding: "0.5rem" }}>
+                                    <span style={{ 
+                                      padding: "0.25rem 0.5rem", 
+                                      borderRadius: "3px", 
+                                      backgroundColor: cita.estado === 'confirmada' ? '#d4edda' : 
+                                                     cita.estado === 'pendiente' ? '#fff3cd' : '#f8d7da',
+                                      color: cita.estado === 'confirmada' ? '#155724' : 
+                                            cita.estado === 'pendiente' ? '#856404' : '#721c24'
+                                    }}>
+                                      {cita.estado || "Pendiente"}
+                                    </span>
+                                  </td>
+                                  <td style={{ border: "1px solid #dee2e6", padding: "0.5rem" }}>
+                                    <button 
+                                      onClick={() => cancelarCita(cita.id)}
+                                      style={{ 
+                                        padding: "0.25rem 0.5rem", 
+                                        backgroundColor: "#dc3545", 
+                                        color: "white", 
+                                        border: "none", 
+                                        borderRadius: "3px", 
+                                        cursor: "pointer",
+                                        fontSize: "0.875rem"
+                                      }}
+                                    >
+                                      Cancelar
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+
+                        {/* HISTORIAL / CITAS PASADAS */}
+                        <h3>Historial de Citas ({pasadas.length})</h3>
+                        
+                        {/* Controles de filtro */}
+                        <div style={{ display:"flex", gap:"1rem", marginBottom:"1rem", flexWrap: "wrap" }}>
+                          <label style={{ display: "flex", flexDirection: "column" }}>
+                            Desde
+                            <input
+                              type="date"
+                              value={from}
+                              onChange={e => setFrom(e.target.value)}
+                              style={{ padding: "0.25rem", borderRadius: "3px", border: "1px solid #ccc" }}
+                            />
+                          </label>
+                          <label style={{ display: "flex", flexDirection: "column" }}>
+                            Hasta
+                            <input
+                              type="date"
+                              value={to}
+                              onChange={e => setTo(e.target.value)}
+                              style={{ padding: "0.25rem", borderRadius: "3px", border: "1px solid #ccc" }}
+                            />
+                          </label>
+                          <label style={{ display: "flex", flexDirection: "column" }}>
+                            Especialidad
+                            <select
+                              value={espId}
+                              onChange={e => setEspId(e.target.value)}
+                              style={{ padding: "0.25rem", borderRadius: "3px", border: "1px solid #ccc" }}
+                            >
+                              <option value="">Todas</option>
+                              {espList.map(e => (
+                                <option key={e.id} value={e.id}>
+                                  {e.nombreEspecialidad}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label style={{ display: "flex", flexDirection: "column" }}>
+                            Estado
+                            <select
+                              value={estado}
+                              onChange={e => setEstado(e.target.value)}
+                              style={{ padding: "0.25rem", borderRadius: "3px", border: "1px solid #ccc" }}
+                            >
+                              <option value="">Todos</option>
+                              <option value="pendiente">Pendiente</option>
+                              <option value="confirmada">Confirmada</option>
+                              <option value="negada">Negada</option>
+                            </select>
+                          </label>
+                        </div>
+
+                        {/* Aplicamos los filtros a las pasadas */}
+                        {(() => {
+                          let filtradas = [...pasadas];
+                          
+                          if (from) {
+                            filtradas = filtradas.filter(c => {
+                              const fechaCitaStr = c.fecha;
+                              const fechaLimpia = fechaCitaStr.includes('[') 
+                                ? fechaCitaStr.substring(0, fechaCitaStr.indexOf('[')).trim() 
+                                : fechaCitaStr;
+                              const fechaCita = new Date(fechaLimpia);
+                              const fechaFiltro = new Date(from);
+                              return fechaCita >= fechaFiltro;
+                            });
+                          }
+                          
+                          if (to) {
+                            filtradas = filtradas.filter(c => {
+                              const fechaCitaStr = c.fecha;
+                              const fechaLimpia = fechaCitaStr.includes('[') 
+                                ? fechaCitaStr.substring(0, fechaCitaStr.indexOf('[')).trim() 
+                                : fechaCitaStr;
+                              const fechaCita = new Date(fechaLimpia);
+                              const fechaFiltro = new Date(to + 'T23:59:59');
+                              return fechaCita <= fechaFiltro;
+                            });
+                          }
+                          
+                          if (espId) {
+                            filtradas = filtradas.filter(c => c.especialidad?.id?.toString() === espId);
+                          }
+                          
+                          if (estado) {
+                            filtradas = filtradas.filter(c => c.estado === estado);
+                          }
+
+                          return filtradas.length === 0 ? (
+                            <p>No hay citas en el historial con los filtros aplicados.</p>
+                          ) : (
+                            <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                              <thead>
+                                <tr style={{ backgroundColor: "#f8f9fa" }}>
+                                  <th style={{ border: "1px solid #dee2e6", padding: "0.5rem", textAlign: "left" }}>Fecha</th>
+                                  <th style={{ border: "1px solid #dee2e6", padding: "0.5rem", textAlign: "left" }}>Médico</th>
+                                  <th style={{ border: "1px solid #dee2e6", padding: "0.5rem", textAlign: "left" }}>Especialidad</th>
+                                  <th style={{ border: "1px solid #dee2e6", padding: "0.5rem", textAlign: "left" }}>Estado</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {filtradas.map(cita => (
+                                  <tr key={cita.id}>
+                                    <td style={{ border: "1px solid #dee2e6", padding: "0.5rem" }}>
+                                      {formatearFecha(cita.fecha)}
+                                    </td>
+                                    <td style={{ border: "1px solid #dee2e6", padding: "0.5rem" }}>
+                                      {cita.medico?.nombre || "No asignado"}
+                                    </td>
+                                    <td style={{ border: "1px solid #dee2e6", padding: "0.5rem" }}>
+                                      {cita.especialidad?.nombreEspecialidad || "No especificada"}
+                                    </td>
+                                    <td style={{ border: "1px solid #dee2e6", padding: "0.5rem" }}>
+                                      <span style={{ 
+                                        padding: "0.25rem 0.5rem", 
+                                        borderRadius: "3px", 
+                                        backgroundColor: cita.estado === 'confirmada' ? '#d4edda' : 
+                                                       cita.estado === 'pendiente' ? '#fff3cd' : '#f8d7da',
+                                        color: cita.estado === 'confirmada' ? '#155724' : 
+                                              cita.estado === 'pendiente' ? '#856404' : '#721c24'
+                                      }}>
+                                        {cita.estado || "Pendiente"}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          );
+                        })()}
+                      </>
+                    );
+                  })()}
+                </>
+              )}
             </>
           )}
         </div>
@@ -366,5 +610,3 @@ const navBtnStyle = {
 };
 
 export default PacientePerfil;
-
-

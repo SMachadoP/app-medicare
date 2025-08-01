@@ -1,10 +1,11 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState} from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import AgregarHorario from "./AgregarHorario";
 import GestionarCitas from "./GestionarCitas";
 import logo from "../logoclinica.jpg";
 import fondoClinica from "../fondoPaginaWeb.jpg";
 import { Link } from "react-router-dom";
+import ReporteCitas from "./ReporteCitas";
 
 const AdministradorPagina = () => {
   const [vista, setVista] = useState("perfil");
@@ -20,13 +21,28 @@ const AdministradorPagina = () => {
 
   const auth = getAuth();
 
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (usr) => {
+      if (usr) {
+        setUser(usr);
+        await cargarEspecialidades(usr);
+        await cargarDatosDesdeBackend(usr);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
   // Carga perfil
-  const cargarDatosDesdeBackend = useCallback(async (usr) => {
+  const cargarDatosDesdeBackend = async (usr) => {
     try {
       const token = await usr.getIdToken();
       const correo = usr.email;
-      const res = await fetch(`http://localhost:8080/appMedica/rest/usuarios/correo/${correo}`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await fetch(`https://b2b642415388.ngrok-free.app/appMedica/rest/usuarios/correo/${correo}`, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'ngrok-skip-browser-warning': 'true',
+          'Accept': 'application/json'
+        },
       });
       if (res.ok) {
         const perfilArray = await res.json();
@@ -43,14 +59,18 @@ const AdministradorPagina = () => {
     } catch (error) {
       console.error("Error de red al cargar perfil:", error);
     }
-  }, []);
+  };
 
   // Carga especialidades
-  const cargarEspecialidades = useCallback(async (usr) => {
+  const cargarEspecialidades = async (usr) => {
     try {
       const token = await usr.getIdToken();
-      const res = await fetch("http://localhost:8080/appMedica/rest/especialidades", {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await fetch("https://b2b642415388.ngrok-free.app/appMedica/rest/especialidades", {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'ngrok-skip-browser-warning': 'true',
+          'Accept': 'application/json'
+        },
       });
       if (res.ok) {
         const data = await res.json();
@@ -63,18 +83,7 @@ const AdministradorPagina = () => {
     } finally {
       setCargandoEspecialidades(false);
     }
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (usr) => {
-      if (usr) {
-        setUser(usr);
-        await cargarEspecialidades(usr);
-        await cargarDatosDesdeBackend(usr);
-      }
-    });
-    return () => unsubscribe();
-  }, [auth, cargarEspecialidades, cargarDatosDesdeBackend]);
+  };
 
   // Validación cédula ecuatoriana
   const validarCedula = (cedula) => {
@@ -108,7 +117,7 @@ const AdministradorPagina = () => {
     setDatos((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Guardar perfil con token y especialidad como objeto
+  // Guardar perfil con token y especialidad como objeto - MEJORADO
   const guardarPerfil = async (e) => {
     e.preventDefault();
     const correo = auth.currentUser.email;
@@ -129,25 +138,56 @@ const AdministradorPagina = () => {
       especialidad: datos.especialidad ? { id: parseInt(datos.especialidad, 10) } : null,
     };
 
+    console.log("=== DEBUG GUARDAR PERFIL ADMIN ===");
+    console.log("Datos a enviar:", datosEnviar);
+    console.log("Especialidad seleccionada:", datos.especialidad);
+
     try {
       const token = await user.getIdToken();
-      const res = await fetch(`http://localhost:8080/appMedica/rest/usuarios/correo/${correo}`, {
+      const res = await fetch(`https://b2b642415388.ngrok-free.app/appMedica/rest/usuarios/correo/${correo}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
+          'ngrok-skip-browser-warning': 'true',
+          'Accept': 'application/json'
         },
         body: JSON.stringify(datosEnviar),
       });
 
+      console.log("Respuesta del servidor:", res.status, res.statusText);
+
       if (!res.ok) {
         const errorText = await res.text();
-        throw new Error(errorText || "Error al actualizar el perfil");
+        console.error("Error del servidor:", errorText);
+        
+        // Intentar parsear como JSON para obtener más detalles
+        try {
+          const errorJson = JSON.parse(errorText);
+          throw new Error(errorJson.mensaje || errorText);
+        } catch (parseError) {
+          throw new Error(`Error ${res.status}: ${errorText}`);
+        }
       }
 
-      alert("Perfil actualizado correctamente");
+      // Intentar parsear la respuesta exitosa
+      let responseData;
+      try {
+        const responseText = await res.text();
+        console.log("Respuesta exitosa:", responseText);
+        responseData = responseText ? JSON.parse(responseText) : {};
+      } catch (parseError) {
+        console.log("Respuesta no es JSON válido, pero la operación fue exitosa");
+        responseData = { mensaje: "Perfil actualizado correctamente" };
+      }
+
+      alert(responseData.mensaje || "Perfil actualizado correctamente");
+      
+      // Recargar los datos desde el backend para reflejar los cambios
+      await cargarDatosDesdeBackend(user);
+      
     } catch (error) {
-      console.error("Error al guardar perfil:", error);
+      console.error("Error completo al guardar perfil:", error);
       alert("Error al guardar perfil: " + error.message);
     }
   };
@@ -191,6 +231,7 @@ const AdministradorPagina = () => {
         <div style={estilos.menuItem} onClick={() => setVista("perfil")}>Perfil</div>
         <div style={estilos.menuItem} onClick={() => setVista("horarios")}>Agregar Horarios</div>
         <div style={estilos.menuItem} onClick={() => setVista("citas")}>Gestionar Citas</div>
+        <div style={estilos.menuItem} onClick={() => setVista("reportes")}>Reportes</div>
         <Link to="/" style={{ color: "white" }}>Cerrar sesión</Link>
       </div>
 
@@ -255,6 +296,7 @@ const AdministradorPagina = () => {
 
         {vista === "horarios" && <AgregarHorario />}
         {vista === "citas" && <GestionarCitas />}
+        {vista === "reportes" && <ReporteCitas />}
       </div>
     </div>
   );

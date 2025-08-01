@@ -1,161 +1,70 @@
-Guía Rápida – App de Citas Médicas 🏥 (Versión 2.0)
+# Getting Started with Create React App
 
-Link de producción: https://appmedica-9a1c9.web.app/
+This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
----
+## Available Scripts
 
-## 1. Ingreso a la App 🔑
-1. Abre tu navegador e ingresa la URL de la aplicación.  
-2. Haz clic en **“Iniciar sesión con Google”**.  
-   - Si tu rol es **paciente**, irás al **Panel de Paciente**.  
-   - Si tu rol es **administrador/médico**, irás al **Panel de Administrador**.
+In the project directory, you can run:
 
----
+### `npm start`
 
-## 2. Panel de Paciente 👩‍⚕️
+Runs the app in the development mode.\
+Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
 
-### 2.1 Menú Lateral 🗂️
-- **Mi Perfil** 👤  
-- **Solicitar Cita** 🗓️  
-- **Mis Citas** 📋  
+The page will reload when you make changes.\
+You may also see any lint errors in the console.
 
-### 2.2 Mi Perfil 👤
-1. Completa/actualiza:
-   - Nombre completo  
-   - Cédula  
-   - Teléfono  
-   - Dirección  
-   - Género  
-2. Presiona **“Guardar Cambios”** 💾.  
-3. Verás: **“Perfil actualizado correctamente”** ✅.  
+### `npm test`
 
----
+Launches the test runner in the interactive watch mode.\
+See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
 
-### 2.3 Solicitar Cita 🗓️
-1. Ve a **Solicitar Cita**.  
-2. Selecciona:
-   - **Especialidad** (e.g. Cardiología)  
-   - **Médico** disponible  
-   - **Horario** libre  
-3. Haz clic en **“Agendar Cita”** 📩.  
-4. Mensaje: **“¡Cita agendada con éxito!”** 🎉.  
-5. Ese turno pasa a **ocupado**.
+### `npm run build`
 
----
+Builds the app for production to the `build` folder.\
+It correctly bundles React in production mode and optimizes the build for the best performance.
 
-### 2.4 Mis Citas 📋
-1. Abre **Mis Citas** para ver:
-   - 🩺 Especialidad  
-   - 👨‍⚕️ Doctor  
-   - 📅 Fecha y Hora  
-   - 📌 Estado:  
-     - 🔵 Pendiente  
-     - ✅ Confirmada  
-     - ❌ Negada  
-2. **Filtros** (historial):
-   - Fecha “Desde” / “Hasta”  
-   - Especialidad  
-   - Estado  
-3. Para **cancelar** (si Pendiente/Confirmada):
-   - Pulsa **“Cancelar Cita”** 🗑️ → confirma.  
-   - La cita se elimina y el turno se libera 🔄.
+The build is minified and the filenames include the hashes.\
+Your app is ready to be deployed!
 
----
+See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
 
-### 2.5 Recordatorios 🔔
-- Cuando el médico **confirma**, el estado cambia a Confirmada.  
-- Recibirás aviso (correo/WhatsApp simulado)  
-  **24 h antes** y **horas previas** a la cita.
+### `npm run eject`
 
----
+**Note: this is a one-way operation. Once you `eject`, you can't go back!**
 
-## 3. Panel de Administrador/Médico 👨‍⚕️
+If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
 
-### 3.1 Menú Lateral 🗂️
-- **Mi Perfil** 👤  
-- **Agregar Horario** 📆  
-- **Gestión de Citas** 📋  
-- **Reportes** 📊  
+Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
 
-### 3.2 Mi Perfil 👤
-1. Completa/actualiza:
-   - Nombre  
-   - Cédula  
-   - Teléfono  
-   - Especialidad  
-2. Haz clic en **“Guardar Cambios”** 💾 → **“Perfil actualizado correctamente”** ✅.
+You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
 
----
+## Learn More
 
-### 3.3 Agregar Horario 📆
-1. Entra a **Agregar Horario**.  
-2. Opciones:
-   - **Generar franjas** por defecto  
-   - **Crear manual**: elige fecha/hora → “Guardar Horario” 💾  
-3. Mensaje: **“¡Horario agregado con éxito!”** 🎉.  
+You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
 
----
+To learn React, check out the [React documentation](https://reactjs.org/).
 
-### 3.4 Gestión de Citas 📋
-1. Accede a **Gestión de Citas**.  
-2. Cada fila muestra:
-   - 👤 Paciente  
-   - 📅 Fecha y Hora  
-   - 📌 Estado Actual  
-3. Desplegable para cambiar a:  
-   - ✅ Confirmada → cita aceptada  
-   - ❌ Negada → cita rechazada + libera horario 🔄  
-4. Confirmar/Negar actualiza instantáneamente ambos lados.
+### Code Splitting
 
----
+This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
 
-### 3.5 Reportes 📊
-1. Ve a **Reportes**.  
-2. Filtra por:
-   - Nombre de Médico  
-   - Especialidad  
-   - Fecha “Desde” / “Hasta”  
-3. **Generar Vista Previa**: tabla con  
-   - Total Citas  
-   - Total Horarios  
-   - % Ocupación  
-4. **Descargar**:
-   - 📄 **PDF**  
-   - 📑 **Excel**  
-5. Usa informes para calibrar carga y disponibilidad.
+### Analyzing the Bundle Size
 
----
+This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
 
-## 4. Ajustes de Interfaz y Móvil 📱
-- Diseño responsivo: sidebar colapsa en menú hamburguesa.  
-- Formularios adaptados a pantallas pequeñas.  
-- Botones grandes y feedback táctil.
+### Making a Progressive Web App
 
----
+This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
 
-## 5. Despliegue y Herramientas 🚀
-- **Backend**: Jakarta EE (WildFly) o Spring Boot + PostgreSQL + REST API  
-- Durante desarrollo: expón con **ngrok**  
-- **Frontend**: React + Firebase Hosting (HTTPS automático)  
-- Ajusta `ngrok-skip-browser-warning` en peticiones al API.
+### Advanced Configuration
 
----
+This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
 
-## 6. Cierre de Sesión y Seguridad 🔒
-- Cierra la pestaña o usa “Cerrar sesión” en menú.  
-- Autenticación segura con Google OAuth2.  
-- No se almacenan contraseñas locales.
+### Deployment
 
----
+This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
 
-## 7. Resumen Final ✅
+### `npm run build` fails to minify
 
-**Para Pacientes**  
-1. Login Google → completa perfil → solicita y gestiona citas → recibe recordatorios.  
-
-**Para Administradores/Médicos**  
-1. Login Google → configura perfil → añade horarios → gestiona solicitudes → analiza reportes.  
-
-¡Listo! Con estos pasos aprovechas al máximo la versión 2.0 de la App de Citas Médicas. 😊
-
-© 2025 Clínica San Sebastián.  
+This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)

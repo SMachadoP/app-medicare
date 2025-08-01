@@ -8,69 +8,119 @@ import { firebaseApp } from "../firebase";
 import logo from "../logoclinica.jpg";
 import fondoClinica from "../fondoPaginaWeb.jpg";
 
+axios.defaults.headers.common['ngrok-skip-browser-warning'] = 'true';
+
 const LoginPagina = () => {
   const navigate = useNavigate();
 
-  const handleLogin = async () => {
-    const auth = getAuth(firebaseApp);
-    const provider = new GoogleAuthProvider();
+  const API_BASE_URL = 'https://b2b642415388.ngrok-free.app/appMedica/rest';
 
+// Luego modifica el handleLogin para usar esta constante:
+const handleLogin = async () => {
+  const auth = getAuth(firebaseApp);
+  const provider = new GoogleAuthProvider();
+
+  try {
+    const result = await signInWithPopup(auth, provider);
+    const email = result.user.email;
+    const nombre = result.user.displayName || "";
+
+    let usuarios = [];
+
+    // Intentar obtener el usuario por correo
     try {
-      const result = await signInWithPopup(auth, provider);
-      const email = result.user.email;
-      const nombre = result.user.displayName || "";
-
-      let usuarios = [];
-
-      // Intentar obtener el usuario por correo
-      try {
-        console.log("GET →", `http://localhost:8080/appMedica/rest/usuarios/correo/${email}`);
-        const respuesta = await axios.get(`http://localhost:8080/appMedica/rest/usuarios/correo/${email}`);
-        usuarios = respuesta.data;
-      } catch (error) {
-        if (error.response && error.response.status === 404) {
-          // Usuario no encontrado, se crea uno nuevo
-          const nuevoUsuario = {
-            nombre: nombre,
-            correo: email,
-            rol: "paciente"
-          };
-          await axios.post(`http://localhost:8080/appMedica/rest/usuarios`, nuevoUsuario);
-
-          // Reintentar obtenerlo después de crearlo
-          const nuevaRespuesta = await axios.get(`http://localhost:8080/appMedica/rest/usuarios/correo/${email}`);
-          usuarios = nuevaRespuesta.data;
-        } else {
-          throw error;
+      const respuesta = await axios.get(
+        `${API_BASE_URL}/usuarios/correo/${email}`,
+        {
+          headers: {
+            'ngrok-skip-browser-warning': 'true',
+            'Accept': 'application/json'
+          }
         }
-      }
-
-      if (!usuarios || usuarios.length === 0) {
-        throw new Error("No se pudo obtener el usuario tras crearlo.");
-      }
-
-      const rolRaw = usuarios[0]?.rol;
-      console.log("Rol obtenido del backend:", rolRaw);
-      if (!rolRaw) {
-        throw new Error("El servidor no devolvió un campo 'rol' para el usuario");
-      }
-      const rol = rolRaw.toLowerCase();
-
-      if (rol === "admin" || rol === "administrador") {
-        navigate("/Administrador");
+      );
+      
+      console.log("Respuesta del servidor:", respuesta.data);
+      
+      // Verificar si es un error (objeto con status:"error")
+      if (respuesta.data && respuesta.data.status === "error") {
+        console.log("Usuario no encontrado, creando uno nuevo...");
+        
+        // Usuario no encontrado, se crea uno nuevo
+        const nuevoUsuario = {
+          nombre: nombre,
+          correo: email,
+          rol: "paciente",
+          telefono: "0000000000", // Valor por defecto
+          cedula: "0000000000"    // Valor por defecto
+        };
+        
+        await axios.post(
+          `${API_BASE_URL}/usuarios`, 
+          nuevoUsuario,
+          {
+            headers: {
+              'ngrok-skip-browser-warning': 'true',
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        
+        // Reintentar obtenerlo después de crearlo
+        const nuevaRespuesta = await axios.get(
+          `${API_BASE_URL}/usuarios/correo/${email}`,
+          {
+            headers: {
+              'ngrok-skip-browser-warning': 'true',
+              'Accept': 'application/json'
+            }
+          }
+        );
+        usuarios = nuevaRespuesta.data;
       } else {
-        navigate("/paciente");
+        // Si no es error, asignar los usuarios
+        usuarios = respuesta.data;
       }
-
+      
     } catch (error) {
-      console.error("Error al iniciar sesión o al consultar rol:", {
-        message: error.message,
-        response: error.response?.data,
-        status:   error.response?.status
-      });
-      alert("Error al iniciar sesión con Google o al consultar el rol del usuario."+ error.message);
+      console.error("Error al comunicarse con el backend:", error);
+      alert("Error al comunicarse con el servidor: " + error.message);
+      return;
     }
-  };
+
+    // Verificar que tengamos usuarios
+    if (!usuarios || !Array.isArray(usuarios) || usuarios.length === 0) {
+      throw new Error("No se pudo obtener el usuario");
+    }
+
+    // Obtener el primer usuario del array
+    const usuario = usuarios[0];
+    console.log("Usuario obtenido:", usuario);
+
+    // Obtener el rol
+    const rolRaw = usuario.rol;
+    console.log("Rol obtenido del backend:", rolRaw);
+    
+    if (!rolRaw) {
+      console.error("Usuario completo:", usuario);
+      throw new Error("El servidor no devolvió un campo 'rol' para el usuario");
+    }
+    
+    const rol = rolRaw.toLowerCase();
+
+    // Navegar según el rol
+    if (rol === "admin" || rol === "administrador") {
+      navigate("/Administrador");
+    } else if (rol === "medico" || rol === "doctor") {
+      navigate("/medico");
+    } else {
+      navigate("/paciente");
+    }
+
+  } catch (error) {
+    console.error("Error al iniciar sesión:", error);
+    alert("Error al iniciar sesión: " + error.message);
+  }
+};
 
   const estilos = {
     pageContainer: {
